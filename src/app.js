@@ -1,8 +1,6 @@
 import cors from "cors";
 import { express } from "express";
 
-// first install {npm i cookie-parser cors}
-
 const app = express();
 
 app.use(
