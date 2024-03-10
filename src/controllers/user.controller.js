@@ -1,10 +1,12 @@
 import jwt from "jsonwebtoken";
-import mongoose from "mongoose";
 import { User } from "../models/user.model.js";
 import { ApiResponce } from "../utils/ApiResponce.js";
 import { APIError } from "../utils/apiError.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
-import { uploadOnCloudinary } from "../utils/cloudinary.js";
+import {
+  deleteFromCloudinary,
+  uploadOnCloudinary,
+} from "../utils/cloudinary.js";
 
 const generateAccessAndRefreshTokens = async (userId) => {
   try {
@@ -200,8 +202,8 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
       secure: true,
     };
 
-    const { accessToken, newRefreshToken } =
-      await generateAccessAndRefreshTokens(user_id);
+    const { accessToken, refreshToken: newRefreshToken } =
+      await generateAccessAndRefreshTokens(user._id);
 
     return res
       .status(200)
@@ -243,7 +245,7 @@ const changeCurrentPassword = asyncHandler(async (req, res) => {
 const getCurrentUser = asyncHandler(async (req, res) => {
   return res
     .status(200)
-    .json(200, req.user, "Current user fetched successfully");
+    .json(new ApiResponce(200, req.user, "Current user fetched successfully"));
 });
 
 const updateAccountDetails = asyncHandler(async (req, res) => {
@@ -278,6 +280,9 @@ const updateUserAvatar = asyncHandler(async (req, res) => {
   if (!avatar.url) {
     throw new APIError(400, "Error while uploading on avatar");
   }
+
+  const tempAvatar = req.user?.avatar;
+
   const user = await User.findByIdAndUpdate(
     req.user?._id,
     {
@@ -288,9 +293,13 @@ const updateUserAvatar = asyncHandler(async (req, res) => {
     { new: true }
   ).select("-password");
 
+  await deleteFromCloudinary(tempAvatar);
+
   return res
     .status(200)
-    .json(new ApiResponce(200, user, "Avatar Update successfully!"));
+    .json(
+      new ApiResponce(200, user, "Avatar Update successfully!")
+    );
 });
 
 const updateUserCoverImage = asyncHandler(async (req, res) => {
@@ -305,6 +314,9 @@ const updateUserCoverImage = asyncHandler(async (req, res) => {
   if (!coverImage.url) {
     throw new APIError(400, "Error while uploading on avatar");
   }
+
+  const tempCoverImage = req.user?.coverImage;
+
   const user = await User.findByIdAndUpdate(
     req.user?._id,
     {
@@ -314,6 +326,8 @@ const updateUserCoverImage = asyncHandler(async (req, res) => {
     },
     { new: true }
   ).select("-password");
+
+  await deleteFromCloudinary(tempCoverImage);
 
   return res
     .status(200)
@@ -395,7 +409,7 @@ const getWatchHistory = asyncHandler(async (req, res) => {
   const user = await User.aggregate([
     {
       $match: {
-        _id: new mongoose.ObjectId(req.user._id),
+        _id: req.user._id,
       },
     },
     {
@@ -434,7 +448,13 @@ const getWatchHistory = asyncHandler(async (req, res) => {
 
   return res
     .status(200)
-    .json(new ApiResponce(200, user[0].watchHistory, "Watch History fetched successfully"));
+    .json(
+      new ApiResponce(
+        200,
+        user[0].watchHistory,
+        "Watch History fetched successfully"
+      )
+    );
 });
 
 export {
